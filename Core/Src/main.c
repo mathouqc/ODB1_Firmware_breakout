@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "GAUL_Drivers/bmp280.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,12 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+BMP280_HandleTypedef bmp280;
 
+float pressure, temperature, humidity;
+
+//uint16_t size;
+//uint8_t Data[256];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,6 +103,18 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+  bmp280_init_default_params(&bmp280.params);
+  bmp280.addr = BMP280_I2C_ADDRESS_0;
+  bmp280.i2c = &hi2c1;
+
+  while (!bmp280_init(&bmp280, &bmp280.params)) {
+	  printf("BMP280 initialization failed\n");
+	  //HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
+	  HAL_Delay(2000);
+  }
+  bool bme280p = bmp280.id == BME280_CHIP_ID;
+  printf("BMP280: found %s\n", bme280p ? "BME280" : "BMP280");
+  //HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
 
   /* USER CODE END 2 */
 
@@ -107,6 +125,24 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	HAL_Delay(100);
+	while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity)) {
+		printf("Temperature/pressure reading failed\n");
+		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
+		HAL_Delay(2000);
+	}
+
+	printf("Pressure: %.2f Pa, Temperature: %.2f C", pressure, temperature);
+	//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
+	if (bme280p) {
+		printf(", Humidity: %.2f\n", humidity);
+		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
+	}
+	else {
+		printf("\n");
+		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
+	}
+	HAL_Delay(2000);
 
   }
   /* USER CODE END 3 */
