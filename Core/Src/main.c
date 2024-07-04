@@ -21,8 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
-#include "GAUL_Drivers/bmp280.h"
+#include "stdio.h"
+
+#include "GAUL_Drivers/BMP280.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,18 +43,14 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
+SPI_HandleTypeDef hspi2;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-BMP280_HandleTypedef bmp280;
+BMP280 bmp_data;
 
-float pressure, temperature, humidity;
-
-//uint16_t size;
-//uint8_t Data[256];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,14 +58,28 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_I2C1_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
-
+void logBMP();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void logBMP()
+{
+  printf("dig_T1: %d\n", bmp_data.calib_data.dig_T1);
+  printf("dig_T2: %d\n", bmp_data.calib_data.dig_T2);
+  printf("dig_T3: %d\n", bmp_data.calib_data.dig_T3);
+  printf("dig_P1: %d\n", bmp_data.calib_data.dig_P1);
+  printf("dig_P2: %d\n", bmp_data.calib_data.dig_P2);
+  printf("dig_P3: %d\n", bmp_data.calib_data.dig_P3);
+  printf("dig_P4: %d\n", bmp_data.calib_data.dig_P4);
+  printf("dig_P5: %d\n", bmp_data.calib_data.dig_P5);
+  printf("dig_P6: %d\n", bmp_data.calib_data.dig_P6);
+  printf("dig_P7: %d\n", bmp_data.calib_data.dig_P7);
+  printf("dig_P8: %d\n", bmp_data.calib_data.dig_P8);
+  printf("dig_P9: %d\n", bmp_data.calib_data.dig_P9);
+}
 /* USER CODE END 0 */
 
 /**
@@ -101,20 +113,21 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
-  MX_I2C1_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  bmp280_init_default_params(&bmp280.params);
-  bmp280.addr = BMP280_I2C_ADDRESS_0;
-  bmp280.i2c = &hi2c1;
 
-  while (!bmp280_init(&bmp280, &bmp280.params)) {
-	  printf("BMP280 initialization failed\n");
-	  //HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
-	  HAL_Delay(2000);
+  // SPI Bug Fix
+  /* Note page 704/1136 RM0008 Rev 21 :
+   * The idle state of SCK must correspond to the polarity selected in the
+   * SPI_CR1 register (by pulling up SCK if CPOL=1 or pulling down SCK if CPOL=0).
+   */
+  uint8_t dummy = 0x00;
+  HAL_SPI_Transmit(&hspi2, &dummy, 1, 1000);
+
+  // Barometer
+  if (BMP280_Init(&bmp_data) != 0) {
+	  printf("BMP280 Initialization Error\n");
   }
-  bool bme280p = bmp280.id == BME280_CHIP_ID;
-  printf("BMP280: found %s\n", bme280p ? "BME280" : "BMP280");
-  //HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
 
   /* USER CODE END 2 */
 
@@ -125,25 +138,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	HAL_Delay(100);
-	while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity)) {
-		printf("Temperature/pressure reading failed\n");
-		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
-		HAL_Delay(2000);
-	}
+	BMP280_ReadTemperature(&bmp_data);
 
-	printf("Pressure: %.2f Pa, Temperature: %.2f C", pressure, temperature);
-	//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
-	if (bme280p) {
-		printf(", Humidity: %.2f\n", humidity);
-		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
-	}
-	else {
-		printf("\n");
-		//HAL_UART_Transmit(&huart1, Data, sizeof(Data), 1000);
-	}
-	HAL_Delay(2000);
+	printf("%f\n", bmp_data.temp_C);
 
+	HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }
@@ -187,36 +186,40 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief SPI2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
+static void MX_SPI2_Init(void)
 {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN SPI2_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+  /* USER CODE END SPI2_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN SPI2_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE BEGIN SPI2_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -304,7 +307,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|BMP_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -312,12 +315,21 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin BMP_CS_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|BMP_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB8 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure peripheral I/O remapping */
+  __HAL_AFIO_REMAP_I2C1_ENABLE();
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
