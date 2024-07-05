@@ -60,26 +60,12 @@ static void MX_USART2_UART_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
-void logBMP();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void logBMP()
-{
-  printf("dig_T1: %d\n", bmp_data.calib_data.dig_T1);
-  printf("dig_T2: %d\n", bmp_data.calib_data.dig_T2);
-  printf("dig_T3: %d\n", bmp_data.calib_data.dig_T3);
-  printf("dig_P1: %d\n", bmp_data.calib_data.dig_P1);
-  printf("dig_P2: %d\n", bmp_data.calib_data.dig_P2);
-  printf("dig_P3: %d\n", bmp_data.calib_data.dig_P3);
-  printf("dig_P4: %d\n", bmp_data.calib_data.dig_P4);
-  printf("dig_P5: %d\n", bmp_data.calib_data.dig_P5);
-  printf("dig_P6: %d\n", bmp_data.calib_data.dig_P6);
-  printf("dig_P7: %d\n", bmp_data.calib_data.dig_P7);
-  printf("dig_P8: %d\n", bmp_data.calib_data.dig_P8);
-  printf("dig_P9: %d\n", bmp_data.calib_data.dig_P9);
-}
+
 /* USER CODE END 0 */
 
 /**
@@ -126,7 +112,8 @@ int main(void)
 
   // Barometer
   if (BMP280_Init(&bmp_data) != 0) {
-	  printf("BMP280 Initialization Error\n");
+    printf("BMP280 Initialization Error\n");
+    return 1; // Error
   }
 
   /* USER CODE END 2 */
@@ -138,11 +125,24 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	BMP280_ReadTemperature(&bmp_data);
 
-	printf("%f\n", bmp_data.temp_C);
+	// Debug timer High (for digital analyzer)
+    //HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);
 
-	HAL_Delay(1000);
+    if (BMP280_ReadAltitude(&bmp_data) != 0) {
+    	printf("ReadAltitude Error\r\n");
+    	continue; // Error, skip this iteration
+    }
+
+    // Debug timer Low (for digital analyzer)
+    //HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
+
+    // UART log
+    char Data[32];
+    sprintf(Data, "%6.1f kPa %5.1f C %8.2f m\r\n", bmp_data.press_Pa / 1000, bmp_data.temp_C, bmp_data.alt_m);
+    HAL_UART_Transmit(&huart2, (uint8_t *)Data, 32, 1000);
+
+    HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -309,6 +309,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|BMP_CS_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
@@ -321,6 +324,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DEBUG_Pin */
+  GPIO_InitStruct.Pin = DEBUG_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DEBUG_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB8 PB9 */
   GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;

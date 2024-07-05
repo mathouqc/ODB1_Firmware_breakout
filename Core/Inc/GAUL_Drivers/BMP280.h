@@ -13,10 +13,13 @@
 #ifndef INC_GAUL_DRIVERS_BMP280_H_
 #define INC_GAUL_DRIVERS_BMP280_H_
 
-#define BMP_CS_Pin				GPIO_PIN_8
-#define BMP_CS_GPIO_Port		GPIOA
+#define BMP_CS_Pin              GPIO_PIN_8
+#define BMP_CS_GPIO_Port        GPIOA
 
-#define SPI_TIMEOUT				1000
+#define SPI_TIMEOUT             1000
+
+// Change before launch !!!
+#define BMP280_PRESS_SEA_LEVEL  101325.0
 
 #define BMP280_DEVICE_ID        0x58
 #define BMP280_RESET_VALUE      0xB6
@@ -32,7 +35,7 @@
 #define BMP280_REG_STATUS       0xF3
 #define BMP280_REG_RESET        0xE0
 #define BMP280_REG_ID           0xD0
-#define BMP280_REG_CALIB_00 	0x88
+#define BMP280_REG_CALIB_00     0x88
 
 // Setting ctrl_meas register (data acquisition options -> indoor navigation osrs_p x16, osrs_t x2, irrcoeff 16)
 // Temperature (osrs_t)    17bit resolution    010 (± 0.0025)
@@ -48,11 +51,6 @@
 //Spi3w          4wire   0
 //000;010;00 = 0x08
 #define BMP280_SETTING_CONFIG 0x08
-
-//#define T0 288.15  		// Temperature mer (kelvin)
-//#define alpha 0.0065  	// Taux de temperature (km/h)
-//#define P0 101325.0  	// Pression atmospherique mer
-//#define beta 5.2561  	// Indice temperature
 
 
 typedef struct {
@@ -73,6 +71,7 @@ typedef struct {
 typedef struct {
     float 				press_Pa;
     float 				temp_C;
+    float				alt_m;
     BMP280_CalibData 	calib_data;
     int32_t 			t_fine;
 //    float 				temperature_ref;
@@ -84,11 +83,13 @@ uint8_t BMP280_Init(BMP280 *BMP_data);
 uint8_t BMP280_ReadCalibrationData(BMP280 *BMP_data);
 
 uint8_t BMP280_ReadTemperature(BMP280 *BMP_data);
-/*uint8_t BMP280_ReadPressure(BMP280 *devBMP);
+uint8_t BMP280_ReadPressure(BMP280 *BMP_data);
 
-uint8_t BMP280_SwapMode(uint8_t mode);
-uint8_t BMP280_MeasureReference(BMP280 *devBMP, float temp_ref, float press_ref);
-float BMP280_PressureToAltitude(float pressure);*/
+uint8_t BMP280_ReadAltitude(BMP280 *BMP_data);
+float BMP280_PressureToAltitude(float pressure);
+
+/*uint8_t BMP280_SwapMode(uint8_t mode);
+uint8_t BMP280_MeasureReference(BMP280 *devBMP, float temp_ref, float press_ref);*/
 
 uint8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size);
 uint8_t BMP280_Write(uint8_t reg, uint8_t value);
