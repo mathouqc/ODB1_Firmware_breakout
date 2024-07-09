@@ -8,8 +8,6 @@
  *  	Autor: mathouqc
  */
 
-#include "stm32f1xx_hal.h"
-
 #ifndef INC_GAUL_DRIVERS_BMP280_H_
 #define INC_GAUL_DRIVERS_BMP280_H_
 
@@ -17,9 +15,6 @@
 #define BMP_CS_GPIO_Port        GPIOA
 
 #define SPI_TIMEOUT             1000
-
-// Change before launch !!!
-#define BMP280_PRESS_SEA_LEVEL  101325.0
 
 #define BMP280_DEVICE_ID        0x58
 #define BMP280_RESET_VALUE      0xB6
@@ -37,20 +32,38 @@
 #define BMP280_REG_ID           0xD0
 #define BMP280_REG_CALIB_00     0x88
 
-// Setting ctrl_meas register (data acquisition options -> indoor navigation osrs_p x16, osrs_t x2, irrcoeff 16)
-// Temperature (osrs_t)    17bit resolution    010 (± 0.0025)
-// Pressure (osrs_p)       20bit resolution    101 (± 0.0003)
-// Power mode              normal              11  (sleep 00 ; force 01/10 ; normal 11)
+#define BMP280_MODE_LOW_POWER 0
+#define BMP280_MODE_NORMAL_POWER 1
+
+// Setting ctrl_meas (data acquisition) register (temp/press oversampling and power mode)
+// Temperature (osrs_t)    osrs_t x2    010
+// Pressure (osrs_p)       osrs_p x8    100
+// Power mode              normal       11  (sleep 00 ; force 01/10 ; normal 11)
+// 010;100;11 = 0x53 (normal)
+#define BMP280_SETTING_CTRL_MEAS_LOW 0x53
+
+// Setting ctrl_meas (data acquisition) register (temp/press oversampling and power mode)
+// Temperature (osrs_t)    osrs_t x2    010
+// Pressure (osrs_p)       osrs_p x16   101
+// Power mode              normal       11  (sleep 00 ; force 01/10 ; normal 11)
 // 010;101;11 = 0x57 (normal)
 #define BMP280_SETTING_CTRL_MEAS_NORMAL 0x57
 
 //Setting config register (rate, filter, interface options)
-//Stanby time    0.5ms   000
-//IIR filter     4x      010
+//Stanby time    62.5ms  001
+//IIR filter     16x     100
 //Bit 1          N/A     0
 //Spi3w          4wire   0
-//000;010;00 = 0x08
-#define BMP280_SETTING_CONFIG 0x08
+//001;100;00 = 0x30
+#define BMP280_SETTING_CONFIG_LOW 0x30
+
+//Setting config register (rate, filter, interface options)
+//Stanby time    0.5ms   000
+//IIR filter     16x     100
+//Bit 1          N/A     0
+//Spi3w          4wire   0
+//000;100;00 = 0x10
+#define BMP280_SETTING_CONFIG_NORMAL 0x10
 
 
 typedef struct {
@@ -70,28 +83,27 @@ typedef struct {
 
 typedef struct {
     float 				press_Pa;
+    float				press_ref_Pa;
     float 				temp_C;
     float				alt_m;
-    BMP280_CalibData 	calib_data;
     int32_t 			t_fine;
-//    float 				temperature_ref;
-//    float 				pressure_ref;
+    BMP280_CalibData 	calib_data;
 } BMP280;
 
-uint8_t BMP280_Init(BMP280 *BMP_data);
+int8_t BMP280_Init(BMP280 *BMP_data);
 
-uint8_t BMP280_ReadCalibrationData(BMP280 *BMP_data);
+int8_t BMP280_SetMode(uint8_t mode);
+int8_t BMP280_ReadCalibrationData(BMP280 *BMP_data);
+int8_t BMP280_MeasureReference(BMP280 *BMP_data, uint16_t samples, uint8_t delay);
 
-uint8_t BMP280_ReadTemperature(BMP280 *BMP_data);
-uint8_t BMP280_ReadPressure(BMP280 *BMP_data);
+int8_t BMP280_ReadTemperature(BMP280 *BMP_data);
+int8_t BMP280_ReadPressure(BMP280 *BMP_data);
 
-uint8_t BMP280_ReadAltitude(BMP280 *BMP_data);
-float BMP280_PressureToAltitude(float pressure);
+int8_t BMP280_ReadAltitude(BMP280 *BMP_data);
+float BMP280_PressureToAltitude(float pressure, float pressure_ref);
 
-/*uint8_t BMP280_SwapMode(uint8_t mode);
-uint8_t BMP280_MeasureReference(BMP280 *devBMP, float temp_ref, float press_ref);*/
-
-uint8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size);
-uint8_t BMP280_Write(uint8_t reg, uint8_t value);
+int8_t BMP280_SoftReset();
+int8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size);
+int8_t BMP280_Write(uint8_t reg, uint8_t value);
 
 #endif /* INC_GAUL_DRIVERS_BMP280_H_ */
