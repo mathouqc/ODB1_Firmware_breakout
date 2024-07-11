@@ -8,6 +8,8 @@
  *  	Autor: mathouqc
  */
 
+#include "stm32f1xx_hal.h"
+
 #ifndef INC_GAUL_DRIVERS_BMP280_H_
 #define INC_GAUL_DRIVERS_BMP280_H_
 

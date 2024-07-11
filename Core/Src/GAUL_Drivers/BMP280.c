@@ -13,7 +13,6 @@
 
 #include "GAUL_Drivers/BMP280.h"
 
-#include "stm32f1xx_hal.h"
 #include "math.h" // for pow()
 
 // SPI2 handler from main.c
@@ -42,7 +41,7 @@ int8_t BMP280_Init(BMP280 *BMP_data) {
     BMP280_SoftReset();
 
     // Check ID
-    BMP280_Read(BMP280_REG_ID, RX_Buffer, 1); // TODO: add error handler
+    BMP280_Read(BMP280_REG_ID, RX_Buffer, 1);
     if (RX_Buffer[0] != BMP280_DEVICE_ID) {
         return -1; // Error can't communicate or device not found
     }
@@ -51,13 +50,13 @@ int8_t BMP280_Init(BMP280 *BMP_data) {
     BMP280_SetMode(BMP280_MODE_NORMAL_POWER);
 
     // Calibration
-    BMP280_ReadCalibrationData(BMP_data); // TODO: add error handler
+    BMP280_ReadCalibrationData(BMP_data);
 
     // Delay to get first measurement
     HAL_Delay(200);
 
     // Set reference
-    if (BMP280_MeasureReference(BMP_data, 40, 50) != 0 || BMP_data->press_ref_Pa < 98000.0 || BMP_data->press_ref_Pa > 120000.0) {
+    if (BMP280_MeasureReference(BMP_data, 40, 50) != 0 || BMP_data->press_ref_Pa < 90000.0 || BMP_data->press_ref_Pa > 110000.0) {
     	BMP_data->press_ref_Pa = 101325.0; // Default value if error or extreme values
     }
 
@@ -127,14 +126,15 @@ int8_t BMP280_ReadCalibrationData(BMP280 *BMP_data) {
  * */
 int8_t BMP280_MeasureReference(BMP280 *BMP_data, uint16_t samples, uint8_t delay) {
 	float sum = 0;
-	for (char i = 0; i < samples; i++)
-	{
+	for (char i = 0; i < samples; i++)	{
 		// Update values
 		if (BMP280_ReadTemperature(BMP_data) != 0) {
 			return -1; // Error
+			// continue instead ?
 		}
 		if (BMP280_ReadPressure(BMP_data) != 0) {
 			return -1; // Error
+			// continue instead ?
 		}
 		sum += BMP_data->press_Pa;
 		HAL_Delay(delay);
