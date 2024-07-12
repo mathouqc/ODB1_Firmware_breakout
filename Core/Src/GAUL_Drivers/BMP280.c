@@ -1,6 +1,7 @@
 /*
  * BMP280.h
  *
+ * BMP280 is a barometer used to get the precise altitude of the rocket.
  * Main functions are "BMP280_Init" to configure BMP280, and "BMP280_ReadAltitude".
  *
  *  Created on: May 18, 2024
