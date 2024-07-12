@@ -32,3 +32,16 @@ int8_t BMP280_TESTS_LogUART() {
 
     return 0; // OK
 }
+
+int8_t BMP280_TESTS_LogSTLINK() {
+
+    if (BMP280_ReadAltitude(&bmp_data) != 0) {
+    	printf("Error BMP280_ReadAltitude\r\n");
+    	return -1; // Error
+    }
+
+    // STLINK log
+	printf("%9.4f kPa %6.2f C %8.2f m\r\n", bmp_data.press_Pa / 1000, bmp_data.temp_C, bmp_data.alt_m);
+
+    return 0; // OK
+}
