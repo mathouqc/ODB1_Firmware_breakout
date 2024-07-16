@@ -40,9 +40,6 @@ int8_t BMP280_Init(BMP280 *BMP_data, SPI_HandleTypeDef *hspi) {
 	// Set BMP280 SPI handler
 	BMP_hspi = hspi;
 
-    // CS_BMP HIGH (BMP280 not selected), ensures the proper functioning of future HAL functions
-    HAL_GPIO_WritePin(BMP_CS_GPIO_Port, BMP_CS_Pin, GPIO_PIN_SET);
-
     // Reset
     if (BMP280_SoftReset() != 0) {
     	return -1; // SPI Error
