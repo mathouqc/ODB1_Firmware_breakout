@@ -11,10 +11,10 @@
 #include "stdio.h"
 
 extern BMP280 bmp_data;
-extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart2; // UART via USB on NUCLEO-F103RB
 
 int8_t BMP280_TESTS_LogUART() {
-    // Debug timer High (for digital analyzer)
+    // Debug timer High (to measure execution time with a digital analyzer)
     HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);
 
     if (BMP280_ReadAltitude(&bmp_data) != 0) {
@@ -22,7 +22,7 @@ int8_t BMP280_TESTS_LogUART() {
     	return -1; // Error
     }
 
-    // Debug timer Low (for digital analyzer)
+    // Debug timer Low (to measure execution time with a digital analyzer)
     HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
 
     // UART log
@@ -34,11 +34,16 @@ int8_t BMP280_TESTS_LogUART() {
 }
 
 int8_t BMP280_TESTS_LogSTLINK() {
+    // Debug timer High (to measure execution time with a digital analyzer)
+    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);
 
     if (BMP280_ReadAltitude(&bmp_data) != 0) {
     	printf("Error BMP280_ReadAltitude\r\n");
     	return -1; // Error
     }
+
+    // Debug timer Low (to measure execution time with a digital analyzer)
+    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
 
     // STLINK log
 	printf("%9.4f kPa %6.2f C %8.2f m\r\n", bmp_data.press_Pa / 1000, bmp_data.temp_C, bmp_data.alt_m);

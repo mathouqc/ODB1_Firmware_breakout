@@ -16,7 +16,7 @@
 #define BMP_CS_Pin              GPIO_PIN_8
 #define BMP_CS_GPIO_Port        GPIOA
 
-#define SPI_TIMEOUT             1000
+#define BMP280_SPI_TIMEOUT      1000
 
 #define BMP280_DEVICE_ID        0x58
 #define BMP280_RESET_VALUE      0xB6
@@ -92,7 +92,7 @@ typedef struct {
     BMP280_CalibData 	calib_data;
 } BMP280;
 
-int8_t BMP280_Init(BMP280 *BMP_data);
+int8_t BMP280_Init(BMP280 *BMP_data, SPI_HandleTypeDef *hspi);
 
 int8_t BMP280_SetMode(uint8_t mode);
 int8_t BMP280_ReadCalibrationData(BMP280 *BMP_data);

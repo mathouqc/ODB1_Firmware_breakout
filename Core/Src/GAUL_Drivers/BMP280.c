@@ -16,42 +16,55 @@
 
 #include "math.h" // for pow()
 
-// SPI2 handler from main.c
-extern SPI_HandleTypeDef hspi2;
+// Pointer to SPI handler
+SPI_HandleTypeDef *BMP_hspi;
 
 // Multi purpose receiving buffer
-uint8_t RX_Buffer[26];
+uint8_t BMP_RX_Buffer[26];
 
 /**
  * Initialize BMP280 sensor.
+ * - Set BMP280 SPI handler
  * - Reset
  * - Validate SPI2 communication with device ID
  * - Read calibration data
  * - Set BMP280 configuration
  *
- * @param BMP_data: pointer to a BMP280 structure
+ * @param BMP_data: pointer to a BMP280 structure.
+ * @param hspi: pointer to a HAL SPI handler.
  *
  * @retval 0 OK
  * @retval -1 ERROR
  */
-int8_t BMP280_Init(BMP280 *BMP_data) {
+int8_t BMP280_Init(BMP280 *BMP_data, SPI_HandleTypeDef *hspi) {
+	// Set BMP280 SPI handler
+	BMP_hspi = hspi;
+
     // CS_BMP HIGH (BMP280 not selected), ensures the proper functioning of future HAL functions
     HAL_GPIO_WritePin(BMP_CS_GPIO_Port, BMP_CS_Pin, GPIO_PIN_SET);
 
     // Reset
-    BMP280_SoftReset();
+    if (BMP280_SoftReset() != 0) {
+    	return -1; // SPI Error
+    }
 
     // Check ID
-    BMP280_Read(BMP280_REG_ID, RX_Buffer, 1);
-    if (RX_Buffer[0] != BMP280_DEVICE_ID) {
+    if (BMP280_Read(BMP280_REG_ID, BMP_RX_Buffer, 1) != 0) {
+    	return -1; // SPI Error
+    }
+    if (BMP_RX_Buffer[0] != BMP280_DEVICE_ID) {
         return -1; // Error can't communicate or device not found
     }
 
     // Set data acquisition and configuration
-    BMP280_SetMode(BMP280_MODE_NORMAL_POWER);
+    if (BMP280_SetMode(BMP280_MODE_NORMAL_POWER) != 0) {
+    	return -1; // SPI Error
+    }
 
     // Calibration
-    BMP280_ReadCalibrationData(BMP_data);
+    if (BMP280_ReadCalibrationData(BMP_data) != 0) {
+    	return -1; // SPI Error
+    }
 
     // Delay to get first measurement
     HAL_Delay(200);
@@ -70,20 +83,31 @@ int8_t BMP280_Init(BMP280 *BMP_data) {
  * @param mode: BMP280_MODE_LOW_POWER or BMP280_MODE_NORMAL_POWER
  *
  * @retval 0 OK
+ * @retval -1 SPI ERROR
  */
 int8_t BMP280_SetMode(uint8_t mode) {
-    BMP280_SoftReset();
+	if (BMP280_SoftReset() != 0) {
+		return -1; // SPI ERROR
+	}
 
     if (mode == BMP280_MODE_LOW_POWER) {
         // Set data acquisition options (temp/press oversampling and power mode)
-    	BMP280_Write(BMP280_REG_CTRL_MEAS, BMP280_SETTING_CTRL_MEAS_LOW);
+    	if (BMP280_Write(BMP280_REG_CTRL_MEAS, BMP280_SETTING_CTRL_MEAS_LOW) != 0) {
+    		return -1; // SPI ERROR
+    	}
         // Set configuration (rate, filter and interface options)
-        BMP280_Write(BMP280_REG_CONFIG, BMP280_SETTING_CONFIG_LOW);
+        if (BMP280_Write(BMP280_REG_CONFIG, BMP280_SETTING_CONFIG_LOW) != 0) {
+        	return -1; // SPI ERROR
+        }
     } else {
         // Set data acquisition options (temp/press oversampling and power mode)
-    	BMP280_Write(BMP280_REG_CTRL_MEAS, BMP280_SETTING_CTRL_MEAS_NORMAL);
+    	if (BMP280_Write(BMP280_REG_CTRL_MEAS, BMP280_SETTING_CTRL_MEAS_NORMAL) != 0) {
+    		return -1; // SPI ERROR
+    	}
         // Set configuration (rate, filter and interface options)
-    	BMP280_Write(BMP280_REG_CONFIG, BMP280_SETTING_CONFIG_NORMAL);
+    	if (BMP280_Write(BMP280_REG_CONFIG, BMP280_SETTING_CONFIG_NORMAL) != 0) {
+    		return -1; // SPI ERROR
+    	}
     }
 
     return 0; //OK
@@ -92,25 +116,28 @@ int8_t BMP280_SetMode(uint8_t mode) {
 /**
  * Reads calibration registers, then store them in the BMP280_CalibData structure.
  *
- * @param BMP_data: pointer to a BMP280 structure
+ * @param BMP_data: pointer to a BMP280 structure.
  *
  * @retval 0 OK
+ * @retval -1 SPI ERROR
  */
 int8_t BMP280_ReadCalibrationData(BMP280 *BMP_data) {
-    BMP280_Read(BMP280_REG_CALIB_00, RX_Buffer, 26);
+    if (BMP280_Read(BMP280_REG_CALIB_00, BMP_RX_Buffer, 26) != 0) {
+    	return -1; // SPI ERROR
+    }
 
-    BMP_data->calib_data.dig_T1 = (RX_Buffer[1] << 8) | RX_Buffer[0];
-    BMP_data->calib_data.dig_T2 = (RX_Buffer[3] << 8) | RX_Buffer[2];
-    BMP_data->calib_data.dig_T3 = (RX_Buffer[5] << 8) | RX_Buffer[4];
-    BMP_data->calib_data.dig_P1 = (RX_Buffer[7] << 8) | RX_Buffer[6];
-    BMP_data->calib_data.dig_P2 = (RX_Buffer[9] << 8) | RX_Buffer[8];
-    BMP_data->calib_data.dig_P3 = (RX_Buffer[11] << 8) | RX_Buffer[10];
-    BMP_data->calib_data.dig_P4 = (RX_Buffer[13] << 8) | RX_Buffer[12];
-    BMP_data->calib_data.dig_P5 = (RX_Buffer[15] << 8) | RX_Buffer[14];
-    BMP_data->calib_data.dig_P6 = (RX_Buffer[17] << 8) | RX_Buffer[16];
-    BMP_data->calib_data.dig_P7 = (RX_Buffer[19] << 8) | RX_Buffer[18];
-    BMP_data->calib_data.dig_P8 = (RX_Buffer[21] << 8) | RX_Buffer[20];
-    BMP_data->calib_data.dig_P9 = (RX_Buffer[23] << 8) | RX_Buffer[22];
+    BMP_data->calib_data.dig_T1 = (BMP_RX_Buffer[1] << 8) | BMP_RX_Buffer[0];
+    BMP_data->calib_data.dig_T2 = (BMP_RX_Buffer[3] << 8) | BMP_RX_Buffer[2];
+    BMP_data->calib_data.dig_T3 = (BMP_RX_Buffer[5] << 8) | BMP_RX_Buffer[4];
+    BMP_data->calib_data.dig_P1 = (BMP_RX_Buffer[7] << 8) | BMP_RX_Buffer[6];
+    BMP_data->calib_data.dig_P2 = (BMP_RX_Buffer[9] << 8) | BMP_RX_Buffer[8];
+    BMP_data->calib_data.dig_P3 = (BMP_RX_Buffer[11] << 8) | BMP_RX_Buffer[10];
+    BMP_data->calib_data.dig_P4 = (BMP_RX_Buffer[13] << 8) | BMP_RX_Buffer[12];
+    BMP_data->calib_data.dig_P5 = (BMP_RX_Buffer[15] << 8) | BMP_RX_Buffer[14];
+    BMP_data->calib_data.dig_P6 = (BMP_RX_Buffer[17] << 8) | BMP_RX_Buffer[16];
+    BMP_data->calib_data.dig_P7 = (BMP_RX_Buffer[19] << 8) | BMP_RX_Buffer[18];
+    BMP_data->calib_data.dig_P8 = (BMP_RX_Buffer[21] << 8) | BMP_RX_Buffer[20];
+    BMP_data->calib_data.dig_P9 = (BMP_RX_Buffer[23] << 8) | BMP_RX_Buffer[22];
 
     return 0; // OK
 }
@@ -118,8 +145,8 @@ int8_t BMP280_ReadCalibrationData(BMP280 *BMP_data) {
 /**
  * Set reference temperature and pressure for altitude calculation by averaging temperature and pressure measurements.
  *
- * @param BMP_data: pointer to a BMP280 structure
- * @param samples: Number of measurements to average.
+ * @param BMP_data: pointer to a BMP280 structure.
+ * @param samples: Number of measurements to average..
  * @param delay: Delay between measurements (in ms).
  *
  * @retval 0 OK
@@ -148,15 +175,17 @@ int8_t BMP280_MeasureReference(BMP280 *BMP_data, uint16_t samples, uint8_t delay
 /**
  * Reads temperature registers, then calculate temperature in Celsius from calibration data.
  *
- * @param BMP_data: pointer to a BMP280 structure
+ * @param BMP_data: pointer to a BMP280 structure.
  *
  * @retval 0 OK
  * @retval -1 ERROR
  */
 int8_t BMP280_ReadTemperature(BMP280 *BMP_data) {
     // Read BMP280 adc value
-    BMP280_Read(BMP280_REG_TEMP_MSB, RX_Buffer, 3);
-    int32_t adc_T = (RX_Buffer[0] << 12) | (RX_Buffer[1] << 4) | ((RX_Buffer[2] >> 4) & 0x0F);
+    if (BMP280_Read(BMP280_REG_TEMP_MSB, BMP_RX_Buffer, 3) != 0) {
+    	return -1; // SPI Error
+    }
+    int32_t adc_T = (BMP_RX_Buffer[0] << 12) | (BMP_RX_Buffer[1] << 4) | ((BMP_RX_Buffer[2] >> 4) & 0x0F);
 
     // 0x80000 means no measurement (3.3.2 Temperature measurement - BMP280 Datasheet)
     if (adc_T == 0x80000) {
@@ -176,15 +205,17 @@ int8_t BMP280_ReadTemperature(BMP280 *BMP_data) {
 /**
  * Reads pressure registers, then calculate pressure in Pascal from calibration data.
  *
- * @param BMP_data: pointer to a BMP280 structure
+ * @param BMP_data: pointer to a BMP280 structure.
  *
  * @retval 0 OK
  * @retval -1 ERROR
  */
 int8_t BMP280_ReadPressure(BMP280 *BMP_data) {
     // Read BMP280 adc value
-    BMP280_Read(BMP280_REG_PRESS_MSB, RX_Buffer, 3);
-    int32_t adc_P = (RX_Buffer[0] << 12) | (RX_Buffer[1] << 4) | ((RX_Buffer[2] >> 4) & 0x0F);
+	if (BMP280_Read(BMP280_REG_PRESS_MSB, BMP_RX_Buffer, 3) != 0) {
+		return -1; // SPI Error
+	}
+    int32_t adc_P = (BMP_RX_Buffer[0] << 12) | (BMP_RX_Buffer[1] << 4) | ((BMP_RX_Buffer[2] >> 4) & 0x0F);
 
     // 0x80000 means no measurement (3.3.1 Pressure measurement - BMP280 Datasheet)
     if (adc_P == 0x80000) {
@@ -216,7 +247,9 @@ int8_t BMP280_ReadPressure(BMP280 *BMP_data) {
  * Reads temperature and pressure values from the BMP280,
  * then calculate the altitude from them.
  *
- * @param BMP_data: pointer to a BMP280 structure
+ * Takes 0.6ms to complete
+ *
+ * @param BMP_data: pointer to a BMP280 structure.
  *
  * @retval 0 OK
  * @retval -1 ERROR
@@ -238,8 +271,8 @@ int8_t BMP280_ReadAltitude(BMP280 *BMP_data) {
 /**
  * Get the altitude from a pressure value using a formula from Bosch Q&A
  *
- * @param pressure: Current pressure in Pascal
- * @param pressure: Reference pressure in Pascal
+ * @param pressure: Current pressure in Pascal.
+ * @param pressure_ref: Reference pressure in Pascal.
  *
  * @return Altitude in meters
  */
@@ -254,22 +287,26 @@ float BMP280_PressureToAltitude(float pressure, float pressure_ref) {
  * "The readout value is always 0x00"
  *
  * @retval 0 OK
+ * @retval -1 SPI ERROR
  */
 int8_t BMP280_SoftReset() {
-    BMP280_Write(BMP280_REG_RESET, BMP280_RESET_VALUE);
+    if (BMP280_Write(BMP280_REG_RESET, BMP280_RESET_VALUE) != 0) {
+    	return -1; // SPI ERROR
+    }
     HAL_Delay(2); // wait 2ms for bmp280 reset
 
-    return 0; //OK
+    return 0; // OK
 }
 
 /**
  * Read BMP280 register using GPIO and SPI2 HAL functions
  *
- * @param reg: 8bit register address to read
- * @param RX_Buffer: 8bit array to store X bytes of data
- * @param size: Number of bytes to read
+ * @param reg: u8bit register address to read.
+ * @param RX_Buffer: u8bit array to store X bytes of data.
+ * @param size: Number of bytes to read.
  *
  * @retval 0 OK
+ * @retval -1 SPI ERROR
  */
 int8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size) {
     // BMP_CS LOW
@@ -277,10 +314,14 @@ int8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size) {
 
     // Transmit Control byte (Read mode + Register address)
     reg |= 0x80; // Read mode
-    HAL_SPI_Transmit(&hspi2, &reg, 1, SPI_TIMEOUT); // TODO: add error handler
+    if (HAL_SPI_Transmit(BMP_hspi, &reg, 1, BMP280_SPI_TIMEOUT) != HAL_OK) {
+    	return -1; // SPI ERROR
+    }
 
     // Receive Data byte
-    HAL_SPI_Receive(&hspi2, RX_Buffer, size, SPI_TIMEOUT); // TODO: add error handler
+    if (HAL_SPI_Receive(BMP_hspi, RX_Buffer, size, BMP280_SPI_TIMEOUT) != HAL_OK) {
+    	return -1; // SPI ERROR
+    }
 
     // BMP_CS HIGH
     HAL_GPIO_WritePin(BMP_CS_GPIO_Port, BMP_CS_Pin, GPIO_PIN_SET);
@@ -291,10 +332,11 @@ int8_t BMP280_Read(uint8_t reg, uint8_t RX_Buffer[], uint8_t size) {
 /**
  * Write to a BMP280 register using GPIO and SPI2 HAL functions
  *
- * @param reg: 8bit register address to write
- * @param data: 8bit data to write
+ * @param reg: u8bit register address to write.
+ * @param data: u8bit data to write.
  *
  * @retval 0 OK
+ * @retval -1 SPI ERROR
  */
 int8_t BMP280_Write(uint8_t reg, uint8_t data) {
     // BMP_CS LOW
@@ -305,7 +347,9 @@ int8_t BMP280_Write(uint8_t reg, uint8_t data) {
 
     // Transmit Control byte and Data byte
     uint8_t TX_Buffer[2] = { reg, data };
-    HAL_SPI_Transmit(&hspi2, TX_Buffer, 2, SPI_TIMEOUT); // TODO: add error handler
+    if (HAL_SPI_Transmit(BMP_hspi, TX_Buffer, 2, BMP280_SPI_TIMEOUT) != HAL_OK) {
+    	return -1; // SPI ERROR
+    }
 
     // BMP_CS HIGH
     HAL_GPIO_WritePin(BMP_CS_GPIO_Port, BMP_CS_Pin, GPIO_PIN_SET);

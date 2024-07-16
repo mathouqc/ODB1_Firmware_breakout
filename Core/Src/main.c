@@ -26,6 +26,9 @@
 #include "GAUL_Drivers/BMP280.h"
 #include "GAUL_Drivers/Tests/BMP280_tests.h"
 
+#include "GAUL_Drivers/L76LM33.h"
+#include "GAUL_Drivers/Tests/L76LM33_tests.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +54,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 BMP280 bmp_data;
+L76LM33 L76_data;
 
 /* USER CODE END PV */
 
@@ -112,8 +116,15 @@ int main(void)
   HAL_SPI_Transmit(&hspi2, &dummy, 1, 1000);
 
   // Barometer
-  if (BMP280_Init(&bmp_data) != 0) {
-    printf("BMP280 Initialization Error\n");
+  if (BMP280_Init(&bmp_data, &hspi2) != 0) {
+    printf("BMP280 Initialization Error\r\n");
+    // TODO: Buzzer or led 10 sec
+    return -1; // Error
+  }
+
+  // GNSS module
+  if (L76LM33_Init(&L76_data, &huart1) != 0) {
+    printf("L76LM33 Initialization Error\r\n");
     // TODO: Buzzer or led 10 sec
     return -1; // Error
   }
@@ -128,9 +139,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    BMP280_TESTS_LogUART();
+    //BMP280_TESTS_LogSTLINK();
 
-    HAL_Delay(50);
+    L76LM33_TESTS_LogSentenceSTLINK();
+
+    HAL_Delay(2000);
   }
   /* USER CODE END 3 */
 }
