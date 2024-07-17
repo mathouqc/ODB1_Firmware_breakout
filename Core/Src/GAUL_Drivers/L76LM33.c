@@ -12,7 +12,7 @@
 
 #include "GAUL_Drivers/L76LM33.h"
 
-//#include "stdio.h" // Only for debug
+#include "stdio.h" // Only for debug
 
 // Pointer to UART handler
 UART_HandleTypeDef *L76_huart;
@@ -138,7 +138,7 @@ int8_t L76LM33_ReadSentence() {
 	}
 
 	// Debug received NMEA sentence
-	//printf("%s\r\n", L76_NMEA_Buffer);
+	printf("%s\r\n", L76_NMEA_Buffer);
 
 	return 0;
 }
