@@ -13,44 +13,6 @@
 extern L76LM33 L76_data;
 extern UART_HandleTypeDef huart2; // UART via USB on NUCLEO-F103RB
 
-uint8_t L76TEST_RX_Buffer[120];
-
-int8_t L76LM33_TESTS_LogSentenceUART() {
-    // Debug timer High (to measure execution time with a digital analyzer)
-    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);
-
-    // CODE
-    if (L76LM33_ReadSentence(L76TEST_RX_Buffer, sizeof(L76TEST_RX_Buffer)) != 0) {
-    	printf("Error L76LM33_ReadSentence\r\n");
-    }
-
-    // Debug timer Low (to measure execution time with a digital analyzer)
-    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
-
-    // UART log
-    HAL_UART_Transmit(&huart2, L76TEST_RX_Buffer, sizeof(L76TEST_RX_Buffer), 1000);
-
-    return 0; // OK
-}
-
-int8_t L76LM33_TESTS_LogSentenceSTLINK() {
-    // Debug timer High (to measure execution time with a digital analyzer)
-    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);
-
-    // CODE
-    if (L76LM33_ReadSentence(L76TEST_RX_Buffer, sizeof(L76TEST_RX_Buffer)) != 0) {
-    	printf("Error L76LM33_ReadSentence\r\n");
-    }
-
-    // Debug timer Low (to measure execution time with a digital analyzer)
-    HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
-
-    // STLINK log
-	//printf("%s\r\n", L76TEST_RX_Buffer);
-
-    return 0; // OK
-}
-
 int8_t L76LM33_TESTS_LogDataUART() {
     // Debug timer High (to measure execution time with a digital analyzer)
     HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_SET);

@@ -13,8 +13,6 @@
 #define DEBUG_Pin GPIO_PIN_7
 #define DEBUG_GPIO_Port GPIOC
 
-int8_t L76LM33_TESTS_LogSentenceUART();
-int8_t L76LM33_TESTS_LogSentenceSTLINK();
 int8_t L76LM33_TESTS_LogDataUART();
 int8_t L76LM33_TESTS_LogDataSTLINK();
 

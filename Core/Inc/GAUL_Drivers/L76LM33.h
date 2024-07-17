@@ -9,11 +9,12 @@
  */
 
 #include "stm32f1xx_hal.h"
+#include "circular_buffer.h"
 
 #ifndef INC_GAUL_DRIVERS_L76LM33_H_
 #define INC_GAUL_DRIVERS_L76LM33_H_
 
-#define L76LM33_UART_TIMEOUT 1500
+#define L76LM33_UART_TIMEOUT 1000
 
 typedef struct {
     int32_t time;         			// Heure en bytes
@@ -25,10 +26,12 @@ typedef struct {
 
 int8_t L76LM33_Init(L76LM33 *L76_data, UART_HandleTypeDef *huart);
 
+void L76LM33_RxCallback(UART_HandleTypeDef *huart);
+
 int8_t L76LM33_Read(L76LM33 *L76_data);
-int8_t L76LM33_ReadSentence(uint8_t RX_Buffer[], uint16_t bufferSize);
-int8_t L76LM33_FindStartingChar(uint8_t RX_Buffer[], uint16_t maxIterations);
-int8_t L76LM33_ReadUntilEndingChar(uint8_t RX_Buffer[], uint16_t startIdx, uint16_t maxLen);
+int8_t L76LM33_ReadSentence();
+int8_t L76LM33_FindStartingChar(uint16_t maxIterations);
+int8_t L76LM33_ReadUntilEndingChar();
 
 int8_t L76LM33_SendCommand(char command[], uint8_t size);
 

@@ -12,11 +12,20 @@
 
 #include "GAUL_Drivers/L76LM33.h"
 
+//#include "stdio.h" // Only for debug
+
 // Pointer to UART handler
 UART_HandleTypeDef *L76_huart;
 
-// Multi purpose receiving buffer
-uint8_t L76_RX_Buffer[120];
+// Received char/byte from UART
+uint8_t L76_receivedByte;
+
+// Circular buffer to store UART data from GNSS module
+circularBuffer_t *L76_circularBuffer = NULL;
+
+// Buffer to store NMEA sentence
+uint8_t L76_NMEA_Buffer[128];
+
 
 /*
  * Source:
@@ -31,33 +40,59 @@ uint8_t L76_RX_Buffer[120];
 
 /**
  * Initialize L76LM33 sensor.
- * - Set UART handler
- * - Only output GPRMC sentence
- * - Set navigation mode
  *
  * @param L76_data: pointer to a L76LM33 structure.
  * @param huart: pointer to a HAL UART handler.
  *
  * @retval 0 OK
+ * @retval -1 ERROR
  */
 int8_t L76LM33_Init(L76LM33 *L76_data, UART_HandleTypeDef *huart) {
 	// Set UART handler
 	L76_huart = huart;
 
+	// Initialize circular buffer
+	L76_circularBuffer = circular_buffer_init(sizeof(char));
+
+	// Receive UART data with interrupts
+	if (HAL_UART_Receive_IT(L76_huart, &L76_receivedByte, 1) != HAL_OK) {
+		return -1; // Error with UART
+	}
+
 	// Only output GPRMC sentence
     char NMEA_RMC[] = "$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*35\r\n";
-    L76LM33_SendCommand(NMEA_RMC, sizeof(NMEA_RMC));
+    if (L76LM33_SendCommand(NMEA_RMC, sizeof(NMEA_RMC)) != 0) {
+    	return -1; // Error with UART
+    }
     // Set navigation mode
     char NMEA_NAVMODE[] = "PMTK886,2*2A\r\n";
-    L76LM33_SendCommand(NMEA_NAVMODE, sizeof(NMEA_NAVMODE));
+    if (L76LM33_SendCommand(NMEA_NAVMODE, sizeof(NMEA_NAVMODE)) != 0) {
+    	return -1; // Error with UART
+    }
 
     return 0; // OK
 }
 
 /**
- * Read and parse a NMEA GPRMC sentence into data structure.
+ * Callback called on incoming UART data. It is called when HAL_UART_RxCpltCallback is called.
+ * Add received byte to UART circular buffer.
  *
- * @param L76_data: pointer to a L76LM33 structure.
+ * @param huart: pointer to a HAL UART handler triggering the callback
+ */
+void L76LM33_RxCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == L76_huart->Instance) {
+		// Add data to circular buffer
+		circular_buffer_push(L76_circularBuffer, &L76_receivedByte);
+		// Receive UART data with interrupts
+		HAL_UART_Receive_IT(L76_huart, &L76_receivedByte, 1);
+	}
+}
+
+/**
+ * Read and parse a NMEA GPRMC sentence into data structure. Call this function
+ * frequently to have the latest GPS data available.
+ *
+ * @param L76_data: pointer to a L76LM33 structure to update.
  *
  * @retval 0 OK
  * @retval -1 ERROR
@@ -65,7 +100,9 @@ int8_t L76LM33_Init(L76LM33 *L76_data, UART_HandleTypeDef *huart) {
  */
 int8_t L76LM33_Read(L76LM33 *L76_data) {
 	// Read sentence
-	L76LM33_ReadSentence(L76_RX_Buffer, sizeof(L76_RX_Buffer));
+	if (L76LM33_ReadSentence() != 0) {
+		return -1; // Error, don't update
+	}
 
 	// Parse sentence
 	// TODO
@@ -74,53 +111,60 @@ int8_t L76LM33_Read(L76LM33 *L76_data) {
 }
 
 /**
- * Read NMEA sentence from UART into RX_Buffer.
- *
- * @param RX_Buffer[]: u8bit array to store NMEA sentence.
- * @param bufferSize: size of receiving buffer.
+ * Read NMEA sentence from UART circular buffer into a NMEA buffer.
  *
  * @retval 0 OK
  * @retval -1 ERROR
  *
  */
-int8_t L76LM33_ReadSentence(uint8_t RX_Buffer[], uint16_t bufferSize) {
+int8_t L76LM33_ReadSentence() {
+	if (circular_buffer_empty(L76_circularBuffer)) {
+		return -1; // Error, empty circular buffer
+	}
+
 	// Clear buffer
-	for (int16_t i = 0; i < bufferSize; i++) {
-		RX_Buffer[i] = 0;
+	for (int16_t i = 0; i < sizeof(L76_NMEA_Buffer); i++) {
+		L76_NMEA_Buffer[i] = 0;
 	}
 
-	if (L76LM33_FindStartingChar(RX_Buffer, 100) != 0) {
-		return -1; // Error, cannot find starting character or error with UART
+	if (L76LM33_FindStartingChar(100) != 0) {
+		return -1; // Error, cannot find starting character
 	}
 
-	if (L76LM33_ReadUntilEndingChar(RX_Buffer, 1, 100) != 0) {
-		return -1; // Error, cannot find ending character or error with UART
+	L76_NMEA_Buffer[0] = '$';
+
+	if (L76LM33_ReadUntilEndingChar() != 0) {
+		return -1; // Error, cannot find ending character
 	}
+
+	// Debug received NMEA sentence
+	//printf("%s\r\n", L76_NMEA_Buffer);
 
 	return 0;
 }
 
 /**
  * Tries to find the starting character ($) by reading a maximum number of
- * characters defined by maxIterations.
+ * characters from UART buffer.
  *
- * @param maxIterations: maximum number of characters to read to find
- * starting character.
+ * @param maxIterations: maximum number of characters to read to find starting character.
  *
  * @retval 0 Found starting character.
- * @retval -1 Error while reading UART.
+ * @retval -1 Error, empty buffer.
  * @retval -2 Error, cannot find starting character in n iterations.
  *
  */
-int8_t L76LM33_FindStartingChar(uint8_t RX_Buffer[], uint16_t maxIterations) {
+int8_t L76LM33_FindStartingChar(uint16_t maxIterations) {
 	// Try to find '$'
 	for (uint16_t i = 0; i < maxIterations; i++) {
-		// Read character from the GPS module
-		if (HAL_UART_Receive(L76_huart, RX_Buffer, 1, L76LM33_UART_TIMEOUT) != HAL_OK) {
-			return -1; // Error while reading UART
+		// Variable to store character from UART buffer
+		uint8_t c;
+		// Read character from UART buffer
+		if (!circular_buffer_pop(L76_circularBuffer, &c)) {
+			return -1; // Error, empty buffer
 		}
 
-		if (RX_Buffer[0] == '$') {
+		if (c == '$') {
 			return 0; // Found starting characters
 		}
 	}
@@ -129,30 +173,25 @@ int8_t L76LM33_FindStartingChar(uint8_t RX_Buffer[], uint16_t maxIterations) {
 }
 
 /**
- * Read fron UART into RX_Buffer. It stores each character starting at startIdx
- * in RX_Buffer until '\n' is found.
- *
- * @param RX_Buffer[]: u8bit array to store received characters.
- * @param startIdx: starting index to write to RX_Buffer and starting index of the loop. Has
- * to be inside RX_Buffer size.
- * @param maxLen: maximum number of character to read into RX_Buffer. Has to be smaller than
- * RX_Buffer size.
+ * Read each character from UART buffer into NMEA_Buffer starting at startIdx until '\n' is found.
  *
  * @retval 0 Found ending character.
- * @retval -1 Error while reading UART.
+ * @retval -1 Error, empty buffer.
  * @retval -2 Error, cannot find '\n' in n iterations.
  *
  */
-int8_t L76LM33_ReadUntilEndingChar(uint8_t RX_Buffer[], uint16_t startIdx, uint16_t maxLen) {
+int8_t L76LM33_ReadUntilEndingChar() {
 	// Read sentence
-	for (uint16_t i = startIdx; i < maxLen; i++) {
-		uint8_t c; // uint8 for HAL_UART_Receive
-		if (HAL_UART_Receive(L76_huart, &c, 1, L76LM33_UART_TIMEOUT) != HAL_OK) {
-			return -1; // Error while reading UART
+	for (uint16_t i = 1; i < sizeof(L76_NMEA_Buffer); i++) {
+		// Variable to store character from UART buffer
+		uint8_t c;
+		// Read character from UART buffer
+		if (!circular_buffer_pop(L76_circularBuffer, &c)) {
+			return -1; // Error, empty buffer
 		}
 
-		// Add character to buffer
-		RX_Buffer[i] = c;
+		// Add character to NMEA buffer
+		L76_NMEA_Buffer[i] = c;
 
 		if (c == '\n') {
 			return 0; // Found ending character
@@ -176,7 +215,9 @@ int8_t L76LM33_SendCommand(char command[], uint8_t size) {
         return -1; // Error
     }
 
-    HAL_UART_Transmit(L76_huart, (uint8_t *)command, size, L76LM33_UART_TIMEOUT); // TODO: add error handler
+    if (HAL_UART_Transmit(L76_huart, (uint8_t *)command, size, L76LM33_UART_TIMEOUT) != HAL_OK) {
+    	return -1; // Error with UART
+    }
 
     return 0; // OK
 }

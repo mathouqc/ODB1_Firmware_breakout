@@ -139,11 +139,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    BMP280_TESTS_LogSTLINK();
+    //BMP280_TESTS_LogSTLINK();
 
-    //L76LM33_TESTS_LogSentenceSTLINK();
+    L76LM33_Read(&L76_data);
 
-    HAL_Delay(2000);
+    HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -241,7 +241,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -274,7 +274,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -365,6 +365,10 @@ int _write(int file, char *ptr, int len)
     ITM_SendChar(*ptr++);
   }
   return len;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  L76LM33_RxCallback(huart);
 }
 /* USER CODE END 4 */
 
