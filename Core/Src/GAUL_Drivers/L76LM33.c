@@ -12,6 +12,8 @@
 
 #include "GAUL_Drivers/L76LM33.h"
 
+#include "circular_buffer.h"
+
 #include "stdio.h" // Only for debug
 
 // Pointer to UART handler
@@ -47,7 +49,7 @@ uint8_t L76_NMEA_Buffer[128];
  * @retval 0 OK
  * @retval -1 ERROR
  */
-int8_t L76LM33_Init(L76LM33 *L76_data, UART_HandleTypeDef *huart) {
+int8_t L76LM33_Init(UART_HandleTypeDef *huart) {
 	// Set UART handler
 	L76_huart = huart;
 
@@ -98,14 +100,43 @@ void L76LM33_RxCallback(UART_HandleTypeDef *huart) {
  * @retval -1 ERROR
  *
  */
-int8_t L76LM33_Read(L76LM33 *L76_data) {
+//int8_t L76LM33_Read(GPS_Data *gps_data) {
+int8_t L76LM33_Read(L76LM33 *L76_Data) {
 	// Read sentence
 	if (L76LM33_ReadSentence() != 0) {
 		return -1; // Error, don't update
 	}
 
+	// Debug received NMEA sentence
+	printf("%s\r\n", L76_NMEA_Buffer);
+
 	// Parse sentence
-	// TODO
+	/*switch (minmea_sentence_id(line, false)) {
+		case MINMEA_SENTENCE_RMC: {
+			struct minmea_sentence_rmc frame;
+			if (minmea_parse_rmc(&frame, line)) {
+				printf("$xxRMC floating point degree coordinates and speed: (%f,%f) %f\n",
+						minmea_tocoord(&frame.latitude),
+						minmea_tocoord(&frame.longitude),
+						minmea_tofloat(&frame.speed));
+			}
+			else {
+				printf("$xxRMC sentence is not parsed\n");
+			}
+		} break;
+
+		case MINMEA_INVALID: {
+			printf("$xxxxx sentence is not valid\n");
+		} break;
+
+		default: {
+			printf("$xxxxx sentence is not parsed\n");
+		} break;
+	}*/
+
+	/*if (NMEA_ValidTrame(L76_NMEA_Buffer) != 0 || NMEA_Decode_GPRMC(L76_NMEA_Buffer, gps_data) != 0) {
+		return -1; // Cannot parse NMEA sentence
+	}*/
 
 	return 0; // OK
 }
@@ -115,76 +146,46 @@ int8_t L76LM33_Read(L76LM33 *L76_data) {
  *
  * @retval 0 OK
  * @retval -1 ERROR
+ * @retval -2 Error, cannot find starting or ending character.
  *
  */
 int8_t L76LM33_ReadSentence() {
 	if (circular_buffer_empty(L76_circularBuffer)) {
-		return -1; // Error, empty circular buffer
+		return -1; // Error, empty UART circular buffer
 	}
 
-	// Clear buffer
+	// Clear NMEA buffer
 	for (int16_t i = 0; i < sizeof(L76_NMEA_Buffer); i++) {
 		L76_NMEA_Buffer[i] = 0;
 	}
 
-	if (L76LM33_FindStartingChar(100) != 0) {
-		return -1; // Error, cannot find starting character
-	}
 
-	L76_NMEA_Buffer[0] = '$';
+	// Variable to store character from UART buffer
+	uint8_t c;
 
-	if (L76LM33_ReadUntilEndingChar() != 0) {
-		return -1; // Error, cannot find ending character
-	}
 
-	// Debug received NMEA sentence
-	printf("%s\r\n", L76_NMEA_Buffer);
-
-	return 0;
-}
-
-/**
- * Tries to find the starting character ($) by reading a maximum number of
- * characters from UART buffer.
- *
- * @param maxIterations: maximum number of characters to read to find starting character.
- *
- * @retval 0 Found starting character.
- * @retval -1 Error, empty buffer.
- * @retval -2 Error, cannot find starting character in n iterations.
- *
- */
-int8_t L76LM33_FindStartingChar(uint16_t maxIterations) {
-	// Try to find '$'
-	for (uint16_t i = 0; i < maxIterations; i++) {
-		// Variable to store character from UART buffer
-		uint8_t c;
+	// Try to find '$' in 100 iterations
+	for (uint16_t i = 0; i < 100; i++) {
 		// Read character from UART buffer
 		if (!circular_buffer_pop(L76_circularBuffer, &c)) {
 			return -1; // Error, empty buffer
 		}
 
 		if (c == '$') {
-			return 0; // Found starting characters
+			// Set starting character in NMEA buffer
+			L76_NMEA_Buffer[0] = '$';
+
+			break; // Found starting characters
 		}
 	}
 
-	return -2; // Error, cannot find starting character in n iterations
-}
+	if (c != '$') {
+		return -2; // Error, cannot find starting character in 100 iterations
+	}
 
-/**
- * Read each character from UART buffer into NMEA_Buffer starting at startIdx until '\n' is found.
- *
- * @retval 0 Found ending character.
- * @retval -1 Error, empty buffer.
- * @retval -2 Error, cannot find '\n' in n iterations.
- *
- */
-int8_t L76LM33_ReadUntilEndingChar() {
-	// Read sentence
+
+	// Read into NMEA buffer until ending character is found
 	for (uint16_t i = 1; i < sizeof(L76_NMEA_Buffer); i++) {
-		// Variable to store character from UART buffer
-		uint8_t c;
 		// Read character from UART buffer
 		if (!circular_buffer_pop(L76_circularBuffer, &c)) {
 			return -1; // Error, empty buffer
@@ -194,11 +195,15 @@ int8_t L76LM33_ReadUntilEndingChar() {
 		L76_NMEA_Buffer[i] = c;
 
 		if (c == '\n') {
-			return 0; // Found ending character
+			break; // Found ending character
 		}
 	}
 
-	return -2; // Error, cannot find '\n' in n iterations
+	if (c != '\n') {
+		return -2; // Error, cannot find '\n'
+	}
+
+	return 0;
 }
 
 /**

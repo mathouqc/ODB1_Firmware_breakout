@@ -10,7 +10,6 @@
 #include "GAUL_Drivers/L76LM33.h"
 #include "stdio.h"
 
-extern L76LM33 L76_data;
 extern UART_HandleTypeDef huart2; // UART via USB on NUCLEO-F103RB
 
 int8_t L76LM33_TESTS_LogDataUART() {

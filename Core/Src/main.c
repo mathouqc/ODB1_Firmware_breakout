@@ -29,6 +29,8 @@
 #include "GAUL_Drivers/L76LM33.h"
 #include "GAUL_Drivers/Tests/L76LM33_tests.h"
 
+//#include "GAUL_Drivers/NMEA.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +56,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 BMP280 bmp_data;
+//GPS_Data gps_data;
 L76LM33 L76_data;
 
 /* USER CODE END PV */
@@ -123,7 +126,7 @@ int main(void)
   }
 
   // GNSS module
-  if (L76LM33_Init(&L76_data, &huart1) != 0) {
+  if (L76LM33_Init(&huart1) != 0) {
     printf("L76LM33 Initialization Error\r\n");
     // TODO: Buzzer or led 10 sec
     return -1; // Error
@@ -141,7 +144,10 @@ int main(void)
 
     //BMP280_TESTS_LogSTLINK();
 
+    //L76LM33_Read(&gps_data);
     L76LM33_Read(&L76_data);
+
+    //printf("%f %f\r\n", L76_data.latitude, L76_data.longitude);
 
     HAL_Delay(500);
   }
